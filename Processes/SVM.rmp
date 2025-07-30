@@ -1,0 +1,603 @@
+<?xml version="1.0" encoding="UTF-8"?><process version="10.3.000">
+  <context>
+    <input/>
+    <output/>
+    <macros/>
+  </context>
+  <operator activated="true" class="process" compatibility="10.3.000" expanded="true" name="Process">
+    <parameter key="logverbosity" value="init"/>
+    <parameter key="random_seed" value="2001"/>
+    <parameter key="send_mail" value="never"/>
+    <parameter key="notification_email" value=""/>
+    <parameter key="process_duration_for_mail" value="30"/>
+    <parameter key="encoding" value="SYSTEM"/>
+    <process expanded="true">
+      <operator activated="true" class="remember" compatibility="10.0.000" expanded="true" height="68" name="Remember (5)" origin="EXPORTED_AUTOMODEL" width="90" x="112" y="34">
+        <parameter key="name" value="Training Data"/>
+        <parameter key="io_object" value="ExampleSet"/>
+        <parameter key="store_which" value="1"/>
+        <parameter key="remove_from_process" value="true"/>
+        <description align="center" color="transparent" colored="false" width="126">Remember the labeled data.</description>
+      </operator>
+      <operator activated="true" class="subprocess" compatibility="10.3.000" expanded="true" height="68" name="Train Model" origin="EXPORTED_AUTOMODEL" width="90" x="514" y="85">
+        <process expanded="true">
+          <operator activated="true" class="recall" compatibility="10.3.000" expanded="true" height="68" name="Recall Training Data (7)" origin="EXPORTED_AUTOMODEL" width="90" x="45" y="238">
+            <parameter key="name" value="Training Data"/>
+            <parameter key="io_object" value="ExampleSet"/>
+            <parameter key="remove_from_store" value="false"/>
+            <description align="center" color="transparent" colored="false" width="126">Recall training data.</description>
+          </operator>
+          <operator activated="true" class="multiply" compatibility="10.3.000" expanded="true" height="103" name="Multiply (2)" origin="EXPORTED_AUTOMODEL" width="90" x="246" y="238">
+            <description align="center" color="transparent" colored="false" width="126">Copy training data for preparing the cost-based scoring.</description>
+          </operator>
+          <operator activated="true" class="select_subprocess" compatibility="10.3.000" expanded="true" height="82" name="Optimize?" origin="EXPORTED_AUTOMODEL" width="90" x="447" y="34">
+            <parameter key="select_which" value="1"/>
+            <process expanded="true">
+              <operator activated="true" class="concurrency:optimize_parameters_grid" compatibility="8.2.000" expanded="true" height="124" name="Find Optimal Parameters (2)" origin="EXPORTED_AUTOMODEL" width="90" x="45" y="34">
+                <list key="parameters">
+                  <parameter key="Model PO.gamma" value="0.005,5,0.5,0.05,0.1,0.2,1"/>
+                  <parameter key="Model PO.C" value="10,100,1000,2"/>
+                </list>
+                <parameter key="error_handling" value="fail on error"/>
+                <parameter key="log_performance" value="false"/>
+                <parameter key="log_all_criteria" value="false"/>
+                <parameter key="synchronize" value="false"/>
+                <parameter key="enable_parallel_execution" value="false"/>
+                <process expanded="true">
+                  <operator activated="true" class="concurrency:cross_validation" compatibility="8.2.000" expanded="true" height="145" name="Validation PO (3)" origin="EXPORTED_AUTOMODEL" width="90" x="112" y="85">
+                    <parameter key="split_on_batch_attribute" value="false"/>
+                    <parameter key="leave_one_out" value="false"/>
+                    <parameter key="number_of_folds" value="3"/>
+                    <parameter key="sampling_type" value="stratified sampling"/>
+                    <parameter key="use_local_random_seed" value="true"/>
+                    <parameter key="local_random_seed" value="1992"/>
+                    <parameter key="enable_parallel_execution" value="true"/>
+                    <process expanded="true">
+                      <operator activated="true" class="split_data" compatibility="10.0.000" expanded="true" height="103" name="Split Data (10)" origin="EXPORTED_AUTOMODEL" width="90" x="45" y="136">
+                        <enumeration key="partitions">
+                          <parameter key="ratio" value="0.9"/>
+                          <parameter key="ratio" value="0.1"/>
+                        </enumeration>
+                        <parameter key="sampling_type" value="automatic"/>
+                        <parameter key="use_local_random_seed" value="true"/>
+                        <parameter key="local_random_seed" value="1992"/>
+                        <description align="center" color="transparent" colored="false" width="126">Create calibration data.</description>
+                      </operator>
+                      <operator activated="true" class="support_vector_machine_libsvm" compatibility="10.3.000" expanded="true" height="82" name="Model PO" origin="EXPORTED_AUTOMODEL" width="90" x="179" y="34">
+                        <parameter key="svm_type" value="C-SVC"/>
+                        <parameter key="kernel_type" value="rbf"/>
+                        <parameter key="degree" value="3"/>
+                        <parameter key="gamma" value="0.04999999999999999"/>
+                        <parameter key="coef0" value="0.0"/>
+                        <parameter key="C" value="100.0"/>
+                        <parameter key="nu" value="0.5"/>
+                        <parameter key="cache_size" value="80"/>
+                        <parameter key="epsilon" value="0.001"/>
+                        <parameter key="p" value="0.1"/>
+                        <list key="class_weights"/>
+                        <parameter key="shrinking" value="true"/>
+                        <parameter key="calculate_confidences" value="true"/>
+                        <parameter key="confidence_for_multiclass" value="true"/>
+                        <description align="center" color="transparent" colored="false" width="126">Train model.</description>
+                      </operator>
+                      <operator activated="true" class="model_simulator:rescale_confidences_logistic" compatibility="10.3.000" expanded="true" height="103" name="Calibrate PO (3)" origin="EXPORTED_AUTOMODEL" width="90" x="313" y="136">
+                        <description align="center" color="transparent" colored="false" width="126">Calibrate confidences.</description>
+                      </operator>
+                      <connect from_port="training set" to_op="Split Data (10)" to_port="example set"/>
+                      <connect from_op="Split Data (10)" from_port="partition 1" to_op="Model PO" to_port="training set"/>
+                      <connect from_op="Split Data (10)" from_port="partition 2" to_op="Calibrate PO (3)" to_port="test set"/>
+                      <connect from_op="Model PO" from_port="model" to_op="Calibrate PO (3)" to_port="model"/>
+                      <connect from_op="Model PO" from_port="exampleSet" to_op="Calibrate PO (3)" to_port="training set"/>
+                      <connect from_op="Calibrate PO (3)" from_port="model" to_port="model"/>
+                      <portSpacing port="source_training set" spacing="0"/>
+                      <portSpacing port="sink_model" spacing="0"/>
+                      <portSpacing port="sink_through 1" spacing="0"/>
+                    </process>
+                    <process expanded="true">
+                      <operator activated="true" class="apply_model" compatibility="10.3.000" expanded="true" height="82" name="Apply Model PO (3)" origin="EXPORTED_AUTOMODEL" width="90" x="45" y="34">
+                        <list key="application_parameters"/>
+                        <description align="center" color="transparent" colored="false" width="126">Apply model.</description>
+                      </operator>
+                      <operator activated="true" class="performance_classification" compatibility="10.3.000" expanded="true" height="82" name="Performance PO (3)" origin="EXPORTED_AUTOMODEL" width="90" x="179" y="34">
+                        <parameter key="main_criterion" value="first"/>
+                        <parameter key="accuracy" value="false"/>
+                        <parameter key="classification_error" value="false"/>
+                        <parameter key="kappa" value="false"/>
+                        <parameter key="weighted_mean_recall" value="false"/>
+                        <parameter key="weighted_mean_precision" value="true"/>
+                        <parameter key="spearman_rho" value="false"/>
+                        <parameter key="kendall_tau" value="false"/>
+                        <parameter key="absolute_error" value="false"/>
+                        <parameter key="relative_error" value="false"/>
+                        <parameter key="relative_error_lenient" value="false"/>
+                        <parameter key="relative_error_strict" value="false"/>
+                        <parameter key="normalized_absolute_error" value="false"/>
+                        <parameter key="root_mean_squared_error" value="false"/>
+                        <parameter key="root_relative_squared_error" value="false"/>
+                        <parameter key="squared_error" value="false"/>
+                        <parameter key="correlation" value="false"/>
+                        <parameter key="squared_correlation" value="false"/>
+                        <parameter key="cross-entropy" value="false"/>
+                        <parameter key="margin" value="false"/>
+                        <parameter key="soft_margin_loss" value="false"/>
+                        <parameter key="logistic_loss" value="false"/>
+                        <parameter key="skip_undefined_labels" value="true"/>
+                        <parameter key="use_example_weights" value="true"/>
+                        <list key="class_weights"/>
+                        <description align="center" color="transparent" colored="false" width="126">Calculate performance.</description>
+                      </operator>
+                      <connect from_port="model" to_op="Apply Model PO (3)" to_port="model"/>
+                      <connect from_port="test set" to_op="Apply Model PO (3)" to_port="unlabelled data"/>
+                      <connect from_op="Apply Model PO (3)" from_port="labelled data" to_op="Performance PO (3)" to_port="labelled data"/>
+                      <connect from_op="Performance PO (3)" from_port="performance" to_port="performance 1"/>
+                      <portSpacing port="source_model" spacing="0"/>
+                      <portSpacing port="source_test set" spacing="0"/>
+                      <portSpacing port="source_through 1" spacing="0"/>
+                      <portSpacing port="sink_test set results" spacing="0"/>
+                      <portSpacing port="sink_performance 1" spacing="0"/>
+                      <portSpacing port="sink_performance 2" spacing="0"/>
+                    </process>
+                    <description align="center" color="transparent" colored="false" width="126">Cross-validate the model and build final model on complete data.</description>
+                  </operator>
+                  <operator activated="true" class="log" compatibility="10.3.000" expanded="true" height="82" name="Log Performances (3)" origin="EXPORTED_AUTOMODEL" width="90" x="313" y="187">
+                    <list key="log">
+                      <parameter key="Gamma" value="operator.Model PO.parameter.gamma"/>
+                      <parameter key="C" value="operator.Model PO.parameter.C"/>
+                      <parameter key="Error Rate" value="operator.Validation PO (3).value.performance main criterion"/>
+                    </list>
+                    <parameter key="sorting_type" value="none"/>
+                    <parameter key="sorting_k" value="100"/>
+                    <parameter key="persistent" value="false"/>
+                    <description align="center" color="transparent" colored="false" width="126">Log all performances for each parameter combination.</description>
+                  </operator>
+                  <connect from_port="input 1" to_op="Validation PO (3)" to_port="example set"/>
+                  <connect from_op="Validation PO (3)" from_port="model" to_port="model"/>
+                  <connect from_op="Validation PO (3)" from_port="performance 1" to_op="Log Performances (3)" to_port="through 1"/>
+                  <connect from_op="Log Performances (3)" from_port="through 1" to_port="performance"/>
+                  <portSpacing port="source_input 1" spacing="0"/>
+                  <portSpacing port="source_input 2" spacing="0"/>
+                  <portSpacing port="sink_performance" spacing="0"/>
+                  <portSpacing port="sink_model" spacing="0"/>
+                  <portSpacing port="sink_output 1" spacing="0"/>
+                </process>
+                <description align="center" color="transparent" colored="false" width="126">Find optimal parameters.</description>
+              </operator>
+              <operator activated="true" class="remember" compatibility="10.0.000" expanded="true" height="68" name="Remember Optimal Parameters" origin="EXPORTED_AUTOMODEL" width="90" x="246" y="187">
+                <parameter key="name" value="Optimal Parameters"/>
+                <parameter key="io_object" value="ParameterSet"/>
+                <parameter key="store_which" value="1"/>
+                <parameter key="remove_from_process" value="true"/>
+                <description align="center" color="transparent" colored="false" width="126">Remember optimal parameters.</description>
+              </operator>
+              <operator activated="true" class="store" compatibility="10.3.000" expanded="true" height="68" name="Store (2)" width="90" x="246" y="340">
+                <parameter key="repository_entry" value="//Gecko_v1/Data/svm_model_parameters"/>
+              </operator>
+              <connect from_port="input 1" to_op="Find Optimal Parameters (2)" to_port="input 1"/>
+              <connect from_op="Find Optimal Parameters (2)" from_port="model" to_port="output 1"/>
+              <connect from_op="Find Optimal Parameters (2)" from_port="parameter set" to_op="Remember Optimal Parameters" to_port="store"/>
+              <connect from_op="Remember Optimal Parameters" from_port="stored" to_op="Store (2)" to_port="input"/>
+              <portSpacing port="source_input 1" spacing="0"/>
+              <portSpacing port="source_input 2" spacing="0"/>
+              <portSpacing port="sink_output 1" spacing="0"/>
+              <portSpacing port="sink_output 2" spacing="0"/>
+            </process>
+            <process expanded="true">
+              <operator activated="true" class="split_data" compatibility="10.0.000" expanded="true" height="103" name="Split Data (5)" origin="EXPORTED_AUTOMODEL" width="90" x="45" y="136">
+                <enumeration key="partitions">
+                  <parameter key="ratio" value="0.9"/>
+                  <parameter key="ratio" value="0.1"/>
+                </enumeration>
+                <parameter key="sampling_type" value="automatic"/>
+                <parameter key="use_local_random_seed" value="true"/>
+                <parameter key="local_random_seed" value="1992"/>
+                <description align="center" color="transparent" colored="false" width="126">Create calibration data.</description>
+              </operator>
+              <operator activated="true" class="support_vector_machine_libsvm" compatibility="10.3.000" expanded="true" height="82" name="Model" origin="EXPORTED_AUTOMODEL" width="90" x="179" y="34">
+                <parameter key="svm_type" value="C-SVC"/>
+                <parameter key="kernel_type" value="rbf"/>
+                <parameter key="degree" value="3"/>
+                <parameter key="gamma" value="0.001"/>
+                <parameter key="coef0" value="0.0"/>
+                <parameter key="C" value="100.0"/>
+                <parameter key="nu" value="0.5"/>
+                <parameter key="cache_size" value="80"/>
+                <parameter key="epsilon" value="0.001"/>
+                <parameter key="p" value="0.1"/>
+                <list key="class_weights"/>
+                <parameter key="shrinking" value="true"/>
+                <parameter key="calculate_confidences" value="true"/>
+                <parameter key="confidence_for_multiclass" value="true"/>
+                <description align="center" color="transparent" colored="false" width="126">Train model.</description>
+              </operator>
+              <operator activated="true" class="model_simulator:rescale_confidences_logistic" compatibility="10.3.000" expanded="true" height="103" name="Calibrate" origin="EXPORTED_AUTOMODEL" width="90" x="313" y="136">
+                <description align="center" color="transparent" colored="false" width="126">Calibrate the confidences.</description>
+              </operator>
+              <connect from_port="input 1" to_op="Split Data (5)" to_port="example set"/>
+              <connect from_op="Split Data (5)" from_port="partition 1" to_op="Model" to_port="training set"/>
+              <connect from_op="Split Data (5)" from_port="partition 2" to_op="Calibrate" to_port="test set"/>
+              <connect from_op="Model" from_port="model" to_op="Calibrate" to_port="model"/>
+              <connect from_op="Model" from_port="exampleSet" to_op="Calibrate" to_port="training set"/>
+              <connect from_op="Calibrate" from_port="model" to_port="output 1"/>
+              <portSpacing port="source_input 1" spacing="0"/>
+              <portSpacing port="source_input 2" spacing="0"/>
+              <portSpacing port="sink_output 1" spacing="0"/>
+              <portSpacing port="sink_output 2" spacing="0"/>
+            </process>
+            <description align="center" color="transparent" colored="false" width="126">Either optimize the hyperparameters of this model or use the desired parameters.</description>
+          </operator>
+          <operator activated="true" class="model_simulator:cost_sensitive_scoring" compatibility="10.3.000" expanded="true" height="103" name="CSS" origin="EXPORTED_AUTOMODEL" width="90" x="648" y="238">
+            <enumeration key="classes">
+              <parameter key="classes" value="1"/>
+              <parameter key="classes" value="2"/>
+              <parameter key="classes" value="3"/>
+              <parameter key="classes" value="4"/>
+              <parameter key="classes" value="5"/>
+            </enumeration>
+            <parameter key="cost_matrix" value="[-1.0 1.0 1.0 1.0 1.0;1.0 -1.0 1.0 1.0 1.0;1.0 1.0 -1.0 1.0 1.0;1.0 1.0 1.0 -1.0 1.0;1.0 1.0 1.0 1.0 -1.0;]"/>
+            <parameter key="number_of_variants" value="5"/>
+            <description align="center" color="transparent" colored="false" width="126">Apply confidence scaling to optimize accuracy for a given cost matrix.</description>
+          </operator>
+          <operator activated="true" class="remember" compatibility="10.0.000" expanded="true" height="68" name="Remember Model" origin="EXPORTED_AUTOMODEL" width="90" x="849" y="238">
+            <parameter key="name" value="Model"/>
+            <parameter key="io_object" value="Model"/>
+            <parameter key="store_which" value="1"/>
+            <parameter key="remove_from_process" value="true"/>
+            <description align="center" color="transparent" colored="false" width="126">Remember Model.</description>
+          </operator>
+          <connect from_op="Recall Training Data (7)" from_port="result" to_op="Multiply (2)" to_port="input"/>
+          <connect from_op="Multiply (2)" from_port="output 1" to_op="Optimize?" to_port="input 1"/>
+          <connect from_op="Multiply (2)" from_port="output 2" to_op="CSS" to_port="training set"/>
+          <connect from_op="Optimize?" from_port="output 1" to_op="CSS" to_port="model"/>
+          <connect from_op="CSS" from_port="model" to_op="Remember Model" to_port="store"/>
+          <portSpacing port="source_in 1" spacing="0"/>
+          <portSpacing port="sink_out 1" spacing="0"/>
+        </process>
+      </operator>
+      <operator activated="true" class="subprocess" compatibility="10.3.000" expanded="true" height="68" name="Create Production Model" origin="EXPORTED_AUTOMODEL" width="90" x="514" y="238">
+        <process expanded="true">
+          <operator activated="true" class="recall" compatibility="10.3.000" expanded="true" height="68" name="Recall Training Data (8)" origin="EXPORTED_AUTOMODEL" width="90" x="45" y="34">
+            <parameter key="name" value="Training Data"/>
+            <parameter key="io_object" value="ExampleSet"/>
+            <parameter key="remove_from_store" value="false"/>
+            <description align="center" color="transparent" colored="false" width="126">Recall training data.</description>
+          </operator>
+          <operator activated="true" class="remember" compatibility="10.0.000" expanded="true" height="68" name="Remember Production Data" origin="EXPORTED_AUTOMODEL" width="90" x="313" y="34">
+            <parameter key="name" value="Production Data"/>
+            <parameter key="io_object" value="ExampleSet"/>
+            <parameter key="store_which" value="1"/>
+            <parameter key="remove_from_process" value="true"/>
+            <description align="center" color="transparent" colored="false" width="126">Remember the data used to train the final production model.</description>
+          </operator>
+          <operator activated="true" class="extract_macro" compatibility="10.3.000" expanded="true" height="68" name="Remember Production Size" origin="EXPORTED_AUTOMODEL" width="90" x="447" y="34">
+            <parameter key="macro" value="number_of_training_examples"/>
+            <parameter key="macro_type" value="number_of_examples"/>
+            <parameter key="statistics" value="average"/>
+            <parameter key="attribute_name" value=""/>
+            <list key="additional_macros"/>
+            <description align="center" color="transparent" colored="false" width="126">Remember size of final production data set.</description>
+          </operator>
+          <operator activated="true" class="model_simulator:data_statistics" compatibility="10.3.000" expanded="true" height="82" name="Statistics" origin="EXPORTED_AUTOMODEL" width="90" x="581" y="34">
+            <description align="center" color="transparent" colored="false" width="126">Generate the statistics for the fully transformed training data.</description>
+          </operator>
+          <operator activated="true" class="handle_exception" compatibility="10.3.000" expanded="true" height="103" name="Build Production Model" origin="EXPORTED_AUTOMODEL" width="90" x="715" y="187">
+            <parameter key="add_details_to_log" value="false"/>
+            <process expanded="true">
+              <operator activated="true" class="recall" compatibility="10.3.000" expanded="true" height="68" name="Recall (3)" origin="EXPORTED_AUTOMODEL" width="90" x="45" y="391">
+                <parameter key="name" value="Optimal Parameters"/>
+                <parameter key="io_object" value="ParameterSet"/>
+                <parameter key="remove_from_store" value="false"/>
+                <description align="center" color="transparent" colored="false" width="126">Recall optimal parameters.</description>
+              </operator>
+              <operator activated="true" class="set_parameters" compatibility="10.3.000" expanded="true" height="82" name="Set Parameters" origin="EXPORTED_AUTOMODEL" width="90" x="179" y="391">
+                <list key="name_map">
+                  <parameter key="Model PO" value="Production Model PO"/>
+                </list>
+                <description align="center" color="transparent" colored="false" width="126">Use optimal parameters for production model.</description>
+              </operator>
+              <operator activated="true" class="split_data" compatibility="10.0.000" expanded="true" height="103" name="Split Data (6)" origin="EXPORTED_AUTOMODEL" width="90" x="45" y="136">
+                <enumeration key="partitions">
+                  <parameter key="ratio" value="0.9"/>
+                  <parameter key="ratio" value="0.1"/>
+                </enumeration>
+                <parameter key="sampling_type" value="automatic"/>
+                <parameter key="use_local_random_seed" value="true"/>
+                <parameter key="local_random_seed" value="1992"/>
+                <description align="center" color="transparent" colored="false" width="126">Create calibration data.</description>
+              </operator>
+              <operator activated="true" class="support_vector_machine_libsvm" compatibility="10.3.000" expanded="true" height="82" name="Production Model PO" origin="EXPORTED_AUTOMODEL" width="90" x="179" y="34">
+                <parameter key="svm_type" value="C-SVC"/>
+                <parameter key="kernel_type" value="rbf"/>
+                <parameter key="degree" value="3"/>
+                <parameter key="gamma" value="0.04999999999999999"/>
+                <parameter key="coef0" value="0.0"/>
+                <parameter key="C" value="10.0"/>
+                <parameter key="nu" value="0.5"/>
+                <parameter key="cache_size" value="80"/>
+                <parameter key="epsilon" value="0.001"/>
+                <parameter key="p" value="0.1"/>
+                <list key="class_weights"/>
+                <parameter key="shrinking" value="true"/>
+                <parameter key="calculate_confidences" value="true"/>
+                <parameter key="confidence_for_multiclass" value="true"/>
+                <description align="center" color="transparent" colored="false" width="126">Train model.</description>
+              </operator>
+              <operator activated="true" class="model_simulator:rescale_confidences_logistic" compatibility="10.3.000" expanded="true" height="103" name="Production Calibrate PO" origin="EXPORTED_AUTOMODEL" width="90" x="313" y="136">
+                <description align="center" color="transparent" colored="false" width="126">Calibrate the confidences.</description>
+              </operator>
+              <connect from_port="in 1" to_op="Split Data (6)" to_port="example set"/>
+              <connect from_op="Recall (3)" from_port="result" to_op="Set Parameters" to_port="parameter set"/>
+              <connect from_op="Split Data (6)" from_port="partition 1" to_op="Production Model PO" to_port="training set"/>
+              <connect from_op="Split Data (6)" from_port="partition 2" to_op="Production Calibrate PO" to_port="test set"/>
+              <connect from_op="Production Model PO" from_port="model" to_op="Production Calibrate PO" to_port="model"/>
+              <connect from_op="Production Model PO" from_port="exampleSet" to_op="Production Calibrate PO" to_port="training set"/>
+              <connect from_op="Production Calibrate PO" from_port="model" to_port="out 1"/>
+              <connect from_op="Production Calibrate PO" from_port="training set" to_port="out 2"/>
+              <portSpacing port="source_in 1" spacing="0"/>
+              <portSpacing port="source_in 2" spacing="0"/>
+              <portSpacing port="sink_out 1" spacing="0"/>
+              <portSpacing port="sink_out 2" spacing="0"/>
+              <portSpacing port="sink_out 3" spacing="0"/>
+            </process>
+            <process expanded="true">
+              <operator activated="true" class="split_data" compatibility="10.0.000" expanded="true" height="103" name="Split Data (8)" origin="EXPORTED_AUTOMODEL" width="90" x="45" y="136">
+                <enumeration key="partitions">
+                  <parameter key="ratio" value="0.9"/>
+                  <parameter key="ratio" value="0.1"/>
+                </enumeration>
+                <parameter key="sampling_type" value="automatic"/>
+                <parameter key="use_local_random_seed" value="true"/>
+                <parameter key="local_random_seed" value="1992"/>
+                <description align="center" color="transparent" colored="false" width="126">Create calibration data.</description>
+              </operator>
+              <operator activated="true" class="support_vector_machine_libsvm" compatibility="10.3.000" expanded="true" height="82" name="Production Model" origin="EXPORTED_AUTOMODEL" width="90" x="179" y="34">
+                <parameter key="svm_type" value="C-SVC"/>
+                <parameter key="kernel_type" value="rbf"/>
+                <parameter key="degree" value="3"/>
+                <parameter key="gamma" value="0.001"/>
+                <parameter key="coef0" value="0.0"/>
+                <parameter key="C" value="100.0"/>
+                <parameter key="nu" value="0.5"/>
+                <parameter key="cache_size" value="80"/>
+                <parameter key="epsilon" value="0.001"/>
+                <parameter key="p" value="0.1"/>
+                <list key="class_weights"/>
+                <parameter key="shrinking" value="true"/>
+                <parameter key="calculate_confidences" value="true"/>
+                <parameter key="confidence_for_multiclass" value="true"/>
+                <description align="center" color="transparent" colored="false" width="126">Train model.</description>
+              </operator>
+              <operator activated="true" class="model_simulator:rescale_confidences_logistic" compatibility="10.3.000" expanded="true" height="103" name="Production Calibrate" origin="EXPORTED_AUTOMODEL" width="90" x="313" y="136">
+                <description align="center" color="transparent" colored="false" width="126">Calibrate the confidences.</description>
+              </operator>
+              <connect from_port="in 1" to_op="Split Data (8)" to_port="example set"/>
+              <connect from_op="Split Data (8)" from_port="partition 1" to_op="Production Model" to_port="training set"/>
+              <connect from_op="Split Data (8)" from_port="partition 2" to_op="Production Calibrate" to_port="test set"/>
+              <connect from_op="Production Model" from_port="model" to_op="Production Calibrate" to_port="model"/>
+              <connect from_op="Production Model" from_port="exampleSet" to_op="Production Calibrate" to_port="training set"/>
+              <connect from_op="Production Calibrate" from_port="model" to_port="out 1"/>
+              <connect from_op="Production Calibrate" from_port="training set" to_port="out 2"/>
+              <portSpacing port="source_in 1" spacing="0"/>
+              <portSpacing port="source_in 2" spacing="0"/>
+              <portSpacing port="sink_out 1" spacing="0"/>
+              <portSpacing port="sink_out 2" spacing="0"/>
+              <portSpacing port="sink_out 3" spacing="0"/>
+            </process>
+            <description align="center" color="transparent" colored="false" width="126">Build the final model.</description>
+          </operator>
+          <operator activated="true" class="model_simulator:cost_sensitive_scoring" compatibility="10.3.000" expanded="true" height="103" name="Production CSS" origin="EXPORTED_AUTOMODEL" width="90" x="849" y="187">
+            <enumeration key="classes">
+              <parameter key="classes" value="1"/>
+              <parameter key="classes" value="2"/>
+              <parameter key="classes" value="3"/>
+              <parameter key="classes" value="4"/>
+              <parameter key="classes" value="5"/>
+            </enumeration>
+            <parameter key="cost_matrix" value="[-1.0 1.0 1.0 1.0 1.0;1.0 -1.0 1.0 1.0 1.0;1.0 1.0 -1.0 1.0 1.0;1.0 1.0 1.0 -1.0 1.0;1.0 1.0 1.0 1.0 -1.0;]"/>
+            <parameter key="number_of_variants" value="5"/>
+            <description align="center" color="transparent" colored="false" width="126">Apply confidence scaling to optimize accuracy for a given cost matrix.</description>
+          </operator>
+          <operator activated="true" class="remember" compatibility="10.0.000" expanded="true" height="68" name="Remember Production Model" origin="EXPORTED_AUTOMODEL" width="90" x="983" y="187">
+            <parameter key="name" value="Production Model"/>
+            <parameter key="io_object" value="Model"/>
+            <parameter key="store_which" value="1"/>
+            <parameter key="remove_from_process" value="true"/>
+            <description align="center" color="transparent" colored="false" width="126">Remember the prouction model.</description>
+          </operator>
+          <operator activated="true" class="remember" compatibility="10.0.000" expanded="true" height="68" name="Remember Production Statistics" origin="EXPORTED_AUTOMODEL" width="90" x="715" y="34">
+            <parameter key="name" value="Production Statistics"/>
+            <parameter key="io_object" value="StatisticsIOObject"/>
+            <parameter key="store_which" value="1"/>
+            <parameter key="remove_from_process" value="true"/>
+            <description align="center" color="transparent" colored="false" width="126">Remembers the fully transformed training statistics.</description>
+          </operator>
+          <connect from_op="Recall Training Data (8)" from_port="result" to_op="Remember Production Data" to_port="store"/>
+          <connect from_op="Remember Production Data" from_port="stored" to_op="Remember Production Size" to_port="example set"/>
+          <connect from_op="Remember Production Size" from_port="example set" to_op="Statistics" to_port="example set"/>
+          <connect from_op="Statistics" from_port="statistics" to_op="Remember Production Statistics" to_port="store"/>
+          <connect from_op="Statistics" from_port="example set" to_op="Build Production Model" to_port="in 1"/>
+          <connect from_op="Build Production Model" from_port="out 1" to_op="Production CSS" to_port="model"/>
+          <connect from_op="Build Production Model" from_port="out 2" to_op="Production CSS" to_port="training set"/>
+          <connect from_op="Production CSS" from_port="model" to_op="Remember Production Model" to_port="store"/>
+          <portSpacing port="source_in 1" spacing="0"/>
+          <portSpacing port="sink_out 1" spacing="0"/>
+        </process>
+      </operator>
+      <operator activated="true" class="subprocess" compatibility="10.3.000" expanded="true" height="208" name="Process Results" origin="EXPORTED_AUTOMODEL" width="90" x="648" y="34">
+        <process expanded="true">
+          <operator activated="true" class="recall" compatibility="10.3.000" expanded="true" height="68" name="Recall Model (4)" origin="EXPORTED_AUTOMODEL" width="90" x="45" y="238">
+            <parameter key="name" value="Model"/>
+            <parameter key="io_object" value="Model"/>
+            <parameter key="remove_from_store" value="true"/>
+          </operator>
+          <operator activated="true" class="annotate" compatibility="10.3.000" expanded="true" height="68" name="Annotate (3)" origin="EXPORTED_AUTOMODEL" width="90" x="179" y="238">
+            <list key="annotations">
+              <parameter key="AMResult" value="Model"/>
+            </list>
+            <parameter key="duplicate_annotations" value="overwrite"/>
+          </operator>
+          <operator activated="true" class="recall" compatibility="10.3.000" expanded="true" height="68" name="Recall Training Data (5)" origin="EXPORTED_AUTOMODEL" width="90" x="45" y="850">
+            <parameter key="name" value="Training Data"/>
+            <parameter key="io_object" value="ExampleSet"/>
+            <parameter key="remove_from_store" value="true"/>
+          </operator>
+          <operator activated="true" class="annotate" compatibility="10.3.000" expanded="true" height="68" name="Annotate (10)" origin="EXPORTED_AUTOMODEL" width="90" x="179" y="850">
+            <list key="annotations">
+              <parameter key="AMResult" value="Training Data"/>
+            </list>
+            <parameter key="duplicate_annotations" value="overwrite"/>
+          </operator>
+          <operator activated="true" class="recall" compatibility="10.3.000" expanded="true" height="68" name="Recall Production Model" origin="EXPORTED_AUTOMODEL" width="90" x="45" y="1462">
+            <parameter key="name" value="Production Model"/>
+            <parameter key="io_object" value="Model"/>
+            <parameter key="remove_from_store" value="true"/>
+          </operator>
+          <operator activated="true" class="annotate" compatibility="10.3.000" expanded="true" height="68" name="Annotate (14)" origin="EXPORTED_AUTOMODEL" width="90" x="179" y="1462">
+            <list key="annotations">
+              <parameter key="AMResult" value="Production Model"/>
+            </list>
+            <parameter key="duplicate_annotations" value="overwrite"/>
+          </operator>
+          <operator activated="true" class="handle_exception" compatibility="10.3.000" expanded="true" height="82" name="Recall Parameter Performances" origin="EXPORTED_AUTOMODEL" width="90" x="45" y="1564">
+            <parameter key="add_details_to_log" value="false"/>
+            <process expanded="true">
+              <operator activated="true" class="log_to_data" compatibility="10.3.000" expanded="true" height="82" name="Log to Data" origin="EXPORTED_AUTOMODEL" width="90" x="45" y="34">
+                <parameter key="log_name" value="Log Performances"/>
+                <description align="center" color="transparent" colored="false" width="126">Deliver all logged performances.</description>
+              </operator>
+              <connect from_op="Log to Data" from_port="exampleSet" to_port="out 1"/>
+              <portSpacing port="source_in 1" spacing="0"/>
+              <portSpacing port="sink_out 1" spacing="0"/>
+              <portSpacing port="sink_out 2" spacing="0"/>
+            </process>
+            <process expanded="true">
+              <operator activated="true" class="utility:create_exampleset" compatibility="10.3.000" expanded="true" height="68" name="Create ExampleSet (2)" origin="EXPORTED_AUTOMODEL" width="90" x="45" y="34">
+                <parameter key="generator_type" value="comma separated text"/>
+                <parameter key="number_of_examples" value="100"/>
+                <parameter key="use_stepsize" value="false"/>
+                <list key="function_descriptions"/>
+                <parameter key="add_id_attribute" value="false"/>
+                <list key="numeric_series_configuration"/>
+                <list key="date_series_configuration"/>
+                <list key="date_series_configuration (interval)"/>
+                <parameter key="date_format" value="yyyy-MM-dd HH:mm:ss"/>
+                <parameter key="time_zone" value="SYSTEM"/>
+                <parameter key="input_csv_text" value="Empty"/>
+                <parameter key="column_separator" value=","/>
+                <parameter key="parse_all_as_nominal" value="false"/>
+                <parameter key="decimal_point_character" value="."/>
+                <parameter key="trim_attribute_names" value="true"/>
+              </operator>
+              <connect from_op="Create ExampleSet (2)" from_port="output" to_port="out 1"/>
+              <portSpacing port="source_in 1" spacing="0"/>
+              <portSpacing port="sink_out 1" spacing="0"/>
+              <portSpacing port="sink_out 2" spacing="0"/>
+            </process>
+          </operator>
+          <operator activated="true" class="annotate" compatibility="10.3.000" expanded="true" height="68" name="Annotate (15)" origin="EXPORTED_AUTOMODEL" width="90" x="179" y="1564">
+            <list key="annotations">
+              <parameter key="AMResult" value="Parameter Performances"/>
+            </list>
+            <parameter key="duplicate_annotations" value="overwrite"/>
+          </operator>
+          <operator activated="true" class="handle_exception" compatibility="10.3.000" expanded="true" height="82" name="Recall Parameters" origin="EXPORTED_AUTOMODEL" width="90" x="45" y="1666">
+            <parameter key="add_details_to_log" value="false"/>
+            <process expanded="true">
+              <operator activated="true" class="recall" compatibility="10.3.000" expanded="true" height="68" name="Recall (4)" origin="EXPORTED_AUTOMODEL" width="90" x="45" y="34">
+                <parameter key="name" value="Optimal Parameters"/>
+                <parameter key="io_object" value="ParameterSet"/>
+                <parameter key="remove_from_store" value="true"/>
+              </operator>
+              <connect from_op="Recall (4)" from_port="result" to_port="out 1"/>
+              <portSpacing port="source_in 1" spacing="0"/>
+              <portSpacing port="sink_out 1" spacing="0"/>
+              <portSpacing port="sink_out 2" spacing="0"/>
+            </process>
+            <process expanded="true">
+              <operator activated="true" class="utility:create_exampleset" compatibility="10.3.000" expanded="true" height="68" name="Create ExampleSet (3)" origin="EXPORTED_AUTOMODEL" width="90" x="45" y="34">
+                <parameter key="generator_type" value="comma separated text"/>
+                <parameter key="number_of_examples" value="100"/>
+                <parameter key="use_stepsize" value="false"/>
+                <list key="function_descriptions"/>
+                <parameter key="add_id_attribute" value="false"/>
+                <list key="numeric_series_configuration"/>
+                <list key="date_series_configuration"/>
+                <list key="date_series_configuration (interval)"/>
+                <parameter key="date_format" value="yyyy-MM-dd HH:mm:ss"/>
+                <parameter key="time_zone" value="SYSTEM"/>
+                <parameter key="input_csv_text" value="Empty"/>
+                <parameter key="column_separator" value=","/>
+                <parameter key="parse_all_as_nominal" value="false"/>
+                <parameter key="decimal_point_character" value="."/>
+                <parameter key="trim_attribute_names" value="true"/>
+              </operator>
+              <connect from_op="Create ExampleSet (3)" from_port="output" to_port="out 1"/>
+              <portSpacing port="source_in 1" spacing="0"/>
+              <portSpacing port="sink_out 1" spacing="0"/>
+              <portSpacing port="sink_out 2" spacing="0"/>
+            </process>
+          </operator>
+          <operator activated="true" class="annotate" compatibility="10.3.000" expanded="true" height="68" name="Annotate (16)" origin="EXPORTED_AUTOMODEL" width="90" x="179" y="1666">
+            <list key="annotations">
+              <parameter key="AMResult" value="Optimal Parameters"/>
+            </list>
+            <parameter key="duplicate_annotations" value="overwrite"/>
+          </operator>
+          <operator activated="true" class="recall" compatibility="10.3.000" expanded="true" height="68" name="Recall Production Data" origin="EXPORTED_AUTOMODEL" width="90" x="45" y="1972">
+            <parameter key="name" value="Production Data"/>
+            <parameter key="io_object" value="ExampleSet"/>
+            <parameter key="remove_from_store" value="true"/>
+          </operator>
+          <operator activated="true" class="annotate" compatibility="10.3.000" expanded="true" height="68" name="Annotate (19)" origin="EXPORTED_AUTOMODEL" width="90" x="179" y="1972">
+            <list key="annotations">
+              <parameter key="AMResult" value="Production Data"/>
+            </list>
+            <parameter key="duplicate_annotations" value="overwrite"/>
+          </operator>
+          <operator activated="true" class="recall" compatibility="10.3.000" expanded="true" height="68" name="Recall Production Statistics" origin="EXPORTED_AUTOMODEL" width="90" x="45" y="2176">
+            <parameter key="name" value="Production Statistics"/>
+            <parameter key="io_object" value="StatisticsIOObject"/>
+            <parameter key="remove_from_store" value="true"/>
+          </operator>
+          <operator activated="true" class="annotate" compatibility="10.3.000" expanded="true" height="68" name="Annotate (21)" origin="EXPORTED_AUTOMODEL" width="90" x="179" y="2176">
+            <list key="annotations">
+              <parameter key="AMResult" value="Production Statistics"/>
+            </list>
+            <parameter key="duplicate_annotations" value="overwrite"/>
+          </operator>
+          <connect from_op="Recall Model (4)" from_port="result" to_op="Annotate (3)" to_port="input"/>
+          <connect from_op="Annotate (3)" from_port="output" to_port="out 1"/>
+          <connect from_op="Recall Training Data (5)" from_port="result" to_op="Annotate (10)" to_port="input"/>
+          <connect from_op="Annotate (10)" from_port="output" to_port="out 2"/>
+          <connect from_op="Recall Production Model" from_port="result" to_op="Annotate (14)" to_port="input"/>
+          <connect from_op="Annotate (14)" from_port="output" to_port="out 3"/>
+          <connect from_op="Recall Parameter Performances" from_port="out 1" to_op="Annotate (15)" to_port="input"/>
+          <connect from_op="Annotate (15)" from_port="output" to_port="out 4"/>
+          <connect from_op="Recall Parameters" from_port="out 1" to_op="Annotate (16)" to_port="input"/>
+          <connect from_op="Annotate (16)" from_port="output" to_port="out 5"/>
+          <connect from_op="Recall Production Data" from_port="result" to_op="Annotate (19)" to_port="input"/>
+          <connect from_op="Annotate (19)" from_port="output" to_port="out 6"/>
+          <connect from_op="Recall Production Statistics" from_port="result" to_op="Annotate (21)" to_port="input"/>
+          <connect from_op="Annotate (21)" from_port="output" to_port="out 7"/>
+          <portSpacing port="source_in 1" spacing="0"/>
+          <portSpacing port="sink_out 1" spacing="0"/>
+          <portSpacing port="sink_out 2" spacing="0"/>
+          <portSpacing port="sink_out 3" spacing="0"/>
+          <portSpacing port="sink_out 4" spacing="0"/>
+          <portSpacing port="sink_out 5" spacing="0"/>
+          <portSpacing port="sink_out 6" spacing="0"/>
+          <portSpacing port="sink_out 7" spacing="0"/>
+          <portSpacing port="sink_out 8" spacing="0"/>
+        </process>
+        <description align="center" color="transparent" colored="false" width="126">Collect runtimes and add annotations to the results. Finally, deliver all results to the result ports.</description>
+      </operator>
+      <connect from_port="input 1" to_op="Remember (5)" to_port="store"/>
+      <connect from_op="Process Results" from_port="out 2" to_port="result 2"/>
+      <connect from_op="Process Results" from_port="out 3" to_port="result 1"/>
+      <portSpacing port="source_input 1" spacing="0"/>
+      <portSpacing port="source_input 2" spacing="0"/>
+      <portSpacing port="sink_result 1" spacing="0"/>
+      <portSpacing port="sink_result 2" spacing="0"/>
+      <portSpacing port="sink_result 3" spacing="0"/>
+    </process>
+  </operator>
+</process>

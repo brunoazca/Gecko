@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?><process version="10.3.000">
+  <context>
+    <input/>
+    <output/>
+    <macros/>
+  </context>
+  <operator activated="true" class="process" compatibility="10.3.000" expanded="true" name="Process">
+    <parameter key="logverbosity" value="init"/>
+    <parameter key="random_seed" value="2001"/>
+    <parameter key="send_mail" value="never"/>
+    <parameter key="notification_email" value=""/>
+    <parameter key="process_duration_for_mail" value="30"/>
+    <parameter key="encoding" value="SYSTEM"/>
+    <process expanded="true">
+      <operator activated="true" class="log" compatibility="10.3.000" expanded="true" height="82" name="Predição" width="90" x="849" y="391">
+        <list key="log">
+          <parameter key="Aceleração Confiança Atual" value="operator.Cross A.value.performance main criterion"/>
+          <parameter key="Velocidade Confiança Atual" value="operator.Cross V.value.performance main criterion"/>
+          <parameter key="Frenagem Confiança Atual" value="operator.Cross F.value.performance main criterion"/>
+          <parameter key="Tração Confiança Atual" value="operator.Cross T.value.performance main criterion"/>
+          <parameter key="Manobrabilidade Confiança Atual" value="operator.Cross M.value.performance main criterion"/>
+          <parameter key="Suspensão Confiança Atual" value="operator.Cross S.value.performance main criterion"/>
+        </list>
+        <parameter key="sorting_type" value="none"/>
+        <parameter key="sorting_k" value="100"/>
+        <parameter key="persistent" value="false"/>
+      </operator>
+      <operator activated="true" class="retrieve" compatibility="10.3.000" expanded="true" height="68" name="Retrieve VF-FINAL" width="90" x="112" y="544">
+        <parameter key="repository_entry" value="../Models/VF-FINAL"/>
+      </operator>
+      <operator activated="true" class="apply_model" compatibility="10.3.000" expanded="true" height="82" name="Apply Model (6)" width="90" x="514" y="544">
+        <list key="application_parameters"/>
+      </operator>
+      <operator activated="true" class="retrieve" compatibility="10.3.000" expanded="true" height="68" name="Retrieve TR-FINAL" width="90" x="112" y="442">
+        <parameter key="repository_entry" value="../Models/TR-FINAL"/>
+      </operator>
+      <operator activated="true" class="apply_model" compatibility="10.3.000" expanded="true" height="82" name="Apply Model (5)" width="90" x="514" y="442">
+        <list key="application_parameters"/>
+      </operator>
+      <operator activated="true" class="retrieve" compatibility="10.3.000" expanded="true" height="68" name="Retrieve SUSP-FINAL" width="90" x="112" y="340">
+        <parameter key="repository_entry" value="../Models/SUSP-FINAL"/>
+      </operator>
+      <operator activated="true" class="apply_model" compatibility="10.3.000" expanded="true" height="82" name="Apply Model (4)" width="90" x="514" y="340">
+        <list key="application_parameters"/>
+      </operator>
+      <operator activated="true" class="retrieve" compatibility="10.3.000" expanded="true" height="68" name="Retrieve MN-FINAL" width="90" x="112" y="238">
+        <parameter key="repository_entry" value="../Models/MN-FINAL"/>
+      </operator>
+      <operator activated="true" class="apply_model" compatibility="10.3.000" expanded="true" height="82" name="Apply Model (3)" width="90" x="514" y="238">
+        <list key="application_parameters"/>
+      </operator>
+      <operator activated="true" class="retrieve" compatibility="10.3.000" expanded="true" height="68" name="Retrieve FR-FINAL" width="90" x="112" y="136">
+        <parameter key="repository_entry" value="../Models/FR-FINAL"/>
+      </operator>
+      <operator activated="true" class="apply_model" compatibility="10.3.000" expanded="true" height="82" name="Apply Model (2)" width="90" x="514" y="136">
+        <list key="application_parameters"/>
+      </operator>
+      <operator activated="true" class="retrieve" compatibility="10.3.000" expanded="true" height="68" name="Retrieve AC-FINAL" width="90" x="112" y="34">
+        <parameter key="repository_entry" value="../Models/AC-FINAL"/>
+      </operator>
+      <operator activated="true" class="apply_model" compatibility="10.3.000" expanded="true" height="82" name="Apply Model" width="90" x="514" y="34">
+        <list key="application_parameters"/>
+      </operator>
+      <connect from_op="Predição" from_port="through 1" to_port="result 1"/>
+      <connect from_op="Retrieve VF-FINAL" from_port="output" to_op="Apply Model (6)" to_port="model"/>
+      <connect from_op="Retrieve TR-FINAL" from_port="output" to_op="Apply Model (5)" to_port="model"/>
+      <connect from_op="Retrieve SUSP-FINAL" from_port="output" to_op="Apply Model (4)" to_port="model"/>
+      <connect from_op="Retrieve MN-FINAL" from_port="output" to_op="Apply Model (3)" to_port="model"/>
+      <connect from_op="Retrieve FR-FINAL" from_port="output" to_op="Apply Model (2)" to_port="model"/>
+      <connect from_op="Retrieve AC-FINAL" from_port="output" to_op="Apply Model" to_port="model"/>
+      <portSpacing port="source_input 1" spacing="0"/>
+      <portSpacing port="sink_result 1" spacing="0"/>
+      <portSpacing port="sink_result 2" spacing="0"/>
+    </process>
+  </operator>
+</process>
